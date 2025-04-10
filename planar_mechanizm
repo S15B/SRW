@@ -31,8 +31,8 @@ length_platform = 0.25                              # Bi
 a = np.array([[np.sqrt(2)/2, 2], [2, 1.1], [0, 1]]) # Координаты неподвижных платформ
 
 # Желаемые координаты
-target_position = [0.8475951191177152, 1.199871849332823]
-target_angle =  -0.5482513271592031
+target_position = np.array([1.0255280282756933, 1.352914291818185])
+target_angle = -0.2935903690770708
 
 cyl_rot = p.getQuaternionFromEuler([np.pi/2, 0, 0]) 
 zero_rot = p.getQuaternionFromEuler([0, 0, 0])
@@ -55,69 +55,16 @@ for i in range(7):
     joint_visual_shape.append(p.createVisualShape(p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=[1, 0.5, 0.3125, 1]))
     joint_collision_shape.append(p.createCollisionShape(p.GEOM_CYLINDER, radius=radius, height=height))
 
-# Создание трёх неподвижных тел
-# База - крутящийся шарнир. Соединения - 2 плеча, соединных призматическим соединением
-anchor_id_1 = p.createMultiBody(
-    baseMass=0,                          
-    basePosition=[a[0][0], 0, a[0][1]],      
-    baseCollisionShapeIndex=joint_collision_shape[0],          
-    baseVisualShapeIndex=joint_visual_shape[0],
-    baseOrientation=cyl_rot,
-    linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=[leg_collision_shape[0], [-1]],
-    linkVisualShapeIndices=leg_visual_shape[0:2],
-    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
-    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi])] + [zero_rot] ,
-    linkInertialFramePositions=[[0, 0, 0]] * 2,
-    linkInertialFrameOrientations=[[zero_rot]] * 2,
-    linkParentIndices=[0, 1],
-    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
-    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
-)
-anchor_id_2 = p.createMultiBody(
-    baseMass=0,                          
-    basePosition=[a[1][0], 0, a[1][1]],      
-    baseCollisionShapeIndex=joint_collision_shape[1],          
-    baseVisualShapeIndex=joint_visual_shape[1],
-    baseOrientation=cyl_rot,
-    linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=[leg_collision_shape[2], [-1]],
-    linkVisualShapeIndices=leg_visual_shape[2:4],
-    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
-    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi/2])] + [zero_rot] ,
-    linkInertialFramePositions=[[0, 0, 0]] * 2,
-    linkInertialFrameOrientations=[[zero_rot]] * 2,
-    linkParentIndices=[0, 1],
-    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
-    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
-)
-anchor_id_3 = p.createMultiBody(
-    baseMass=0,                          
-    basePosition=[a[2][0], 0, a[2][1]],      
-    baseCollisionShapeIndex=joint_collision_shape[2],          
-    baseVisualShapeIndex=joint_visual_shape[2],
-    baseOrientation=cyl_rot,
-    linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=[leg_collision_shape[4], [-1]],
-    linkVisualShapeIndices=leg_visual_shape[4:6],
-    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
-    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, -np.pi/3])] + [zero_rot] ,
-    linkInertialFramePositions=[[0, 0, 0]] * 2,
-    linkInertialFrameOrientations=[[zero_rot]] * 2,
-    linkParentIndices=[0, 1],
-    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
-    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
-)
-
 # Создание платформы 
 platform_id = p.createMultiBody(
     baseMass=0.2,
     baseCollisionShapeIndex=joint_collision_shape[3],
     baseVisualShapeIndex=joint_visual_shape[3],
-    basePosition=[1, 0, 1.2],
+    basePosition=[1, 0, 1.3],
     baseOrientation=cyl_rot,
     linkMasses=[0.1]*6,
-    linkCollisionShapeIndices=plat_leg_collision_shape + joint_collision_shape[3:6],
+    #linkCollisionShapeIndices=[plat_leg_collision_shape] + joint_collision_shape[3:6],
+    linkCollisionShapeIndices=[-1]*3 + joint_collision_shape[3:6],
     linkVisualShapeIndices=plat_leg_visual_shape + joint_visual_shape[3:6],
     linkPositions=[[0, length_platform/2, 0], 
                    [length_platform*np.sqrt(3)/4, -length_platform/4, 0],
@@ -134,10 +81,89 @@ platform_id = p.createMultiBody(
     linkJointAxis=[[0, 0, 0]] * 3 + [[0, 0, 1]] * 3
 )
 
-# # Ограничения на поворот
-# p.changeDynamics(anchor_id_1, 0, jointLowerLimit=-np.pi/2, jointUpperLimit=np.pi/4)
-# p.changeDynamics(anchor_id_2, 0, jointLowerLimit=-np.pi/4, jointUpperLimit=np.pi/2)
-# p.changeDynamics(anchor_id_3, 0, jointLowerLimit=-np.pi/4, jointUpperLimit=np.pi/2)
+# Создание трёх неподвижных тел
+# База - крутящийся шарнир. Соединения - 2 плеча, соединных призматическим соединением
+h1 = ((p.getLinkState(platform_id, 1)[0][0] - a[0][0])**2 + (p.getLinkState(platform_id, 1)[0][2] - a[0][1])**2)**(1/2)
+g1 = (p.getLinkState(platform_id, 1)[0][0] - a[0][0])
+
+h2 = ((p.getLinkState(platform_id, 3)[0][0] - a[1][0])**2 + (p.getLinkState(platform_id, 3)[0][2] - a[1][1])**2)**(1/2)
+g2 = (-p.getLinkState(platform_id, 3)[0][0] + a[1][0])
+
+h3 = ((p.getLinkState(platform_id, 5)[0][0] - a[2][0])**2 + (p.getLinkState(platform_id, 5)[0][2] - a[2][1])**2)**(1/2)
+g3 = (p.getLinkState(platform_id, 5)[0][0] - a[2][0])
+
+anchor_id_1 = p.createMultiBody(
+    baseMass=0,                          
+    basePosition=[a[0][0], 0, a[0][1]],      
+    baseCollisionShapeIndex=joint_collision_shape[0],          
+    baseVisualShapeIndex=joint_visual_shape[0],
+    baseOrientation=cyl_rot,
+    linkMasses=[0.1] * 2,
+    linkCollisionShapeIndices=leg_collision_shape[0:2],
+    linkVisualShapeIndices=leg_visual_shape[0:2],
+    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
+    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi + np.arcsin(g1/h1)])] + [zero_rot],
+    linkInertialFramePositions=[[0, 0, 0]] * 2,
+    linkInertialFrameOrientations=[[zero_rot]] * 2,
+    linkParentIndices=[0, 1],
+    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
+    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
+)
+anchor_id_2 = p.createMultiBody(
+    baseMass=0,                          
+    basePosition=[a[1][0], 0, a[1][1]],      
+    baseCollisionShapeIndex=joint_collision_shape[1],          
+    baseVisualShapeIndex=joint_visual_shape[1],
+    baseOrientation=cyl_rot,
+    linkMasses=[0.1] * 2,
+    linkCollisionShapeIndices=leg_collision_shape[2:4],
+    linkVisualShapeIndices=leg_visual_shape[2:4],
+    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
+    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi/2 - np.arccos(g2/h2)])] + [zero_rot] ,
+    linkInertialFramePositions=[[0, 0, 0]] * 2,
+    linkInertialFrameOrientations=[[zero_rot]] * 2,
+    linkParentIndices=[0, 1],
+    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
+    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
+)
+anchor_id_3 = p.createMultiBody(
+    baseMass=0,                          
+    basePosition=[a[2][0], 0, a[2][1]],      
+    baseCollisionShapeIndex=joint_collision_shape[2],          
+    baseVisualShapeIndex=joint_visual_shape[2],
+    baseOrientation=cyl_rot,
+    linkMasses=[0.1] * 2,
+    linkCollisionShapeIndices=leg_collision_shape[4:6],
+    linkVisualShapeIndices=leg_visual_shape[4:6],
+    linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
+    linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, -np.pi/2 + np.arccos(g3/h3)])] + [zero_rot] ,
+    linkInertialFramePositions=[[0, 0, 0]] * 2,
+    linkInertialFrameOrientations=[[zero_rot]] * 2,
+    linkParentIndices=[0, 1],
+    linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_PRISMATIC],
+    linkJointAxis=[[0, 1, 0], [0, 0, 1]] 
+)
+
+p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.POSITION_CONTROL, targetPosition=h1 - radius, force=500)
+p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.POSITION_CONTROL, targetPosition=h2 - radius, force=500)
+p.setJointMotorControl2(anchor_id_3, 1, controlMode=p.POSITION_CONTROL, targetPosition=h3 - radius, force=500)
+
+p.setJointMotorControl2(platform_id, 1, controlMode=p.POSITION_CONTROL, targetPosition=np.arcsin(g1/h1), force=500)
+p.setJointMotorControl2(platform_id, 3, controlMode=p.POSITION_CONTROL, targetPosition=np.pi/6 - np.arccos(g2/h2), force=500)
+p.setJointMotorControl2(platform_id, 5, controlMode=p.POSITION_CONTROL, targetPosition=-np.pi/6 + np.arccos(g3/h3), force=500)
+
+# На стартовую позицию
+for i in range(1, 240):
+    p.stepSimulation()
+    #time.sleep(dt)
+
+p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(anchor_id_3, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+
+p.setJointMotorControl2(platform_id, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(platform_id, 3, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(platform_id, 5, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
 
 # Соединение приводов с платформой
 constraint_id_1 = p.createConstraint(
@@ -145,33 +171,36 @@ constraint_id_1 = p.createConstraint(
     parentLinkIndex=1,
     childBodyUniqueId=platform_id,
     childLinkIndex=1,
+    parentFrameOrientation=p.getQuaternionFromEuler([0, 0, np.pi]),
     childFrameOrientation=p.getQuaternionFromEuler([np.pi/2, 0, 0]),
     jointType=p.JOINT_FIXED, 
     jointAxis=[0, 0, 0],  
     parentFramePosition=[0, 0, length_leg/2],  
-    childFramePosition=[0, 0, 0]  
+    childFramePosition=[0, radius, 0]  
 )
 constraint_id_2 = p.createConstraint(
     parentBodyUniqueId=anchor_id_2, 
     parentLinkIndex=1,
     childBodyUniqueId=platform_id,
-    childLinkIndex=5,
+    childLinkIndex=3,
+    parentFrameOrientation=p.getQuaternionFromEuler([0, 0, np.pi]),
     childFrameOrientation=p.getQuaternionFromEuler([np.pi/2, 0, 0]),
     jointType=p.JOINT_FIXED, 
     jointAxis=[0, 0, 0],  
     parentFramePosition=[0, 0, length_leg/2],  
-    childFramePosition=[0, 0, 0]  
+    childFramePosition=[0, radius, 0]
 )
 constraint_id_3 = p.createConstraint(
     parentBodyUniqueId=anchor_id_3, 
     parentLinkIndex=1,
     childBodyUniqueId=platform_id,
-    childLinkIndex=3,
+    childLinkIndex=5,
+    parentFrameOrientation=p.getQuaternionFromEuler([0, 0, np.pi]),
     childFrameOrientation=p.getQuaternionFromEuler([np.pi/2, 0, 0]),
     jointType=p.JOINT_FIXED, 
     jointAxis=[0, 0, 0],  
     parentFramePosition=[0, 0, length_leg/2],  
-    childFramePosition=[0, 0, 0]  
+    childFramePosition=[0, radius, 0]  
 )
 
 
@@ -185,23 +214,23 @@ p.changeDynamics(anchor_id_3, 1, linearDamping=0, angularDamping=0)
 for i in range(3, 6):
     p.changeDynamics(platform_id, i, linearDamping=0, angularDamping=0)
 
-# На стартовую позицию
-for i in range(1, 240):
-    p.stepSimulation()
-    #time.sleep(dt)
+p.setJointMotorControl2(platform_id, 3, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(platform_id, 4, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+p.setJointMotorControl2(platform_id, 5, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
 
 start_angle = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1]
 
 # Расчет формулы 
-b = np.abs(np.array([[(length_platform * np.sin(target_angle)), length_platform * np.cos(target_angle)],\
-                     [length_platform * np.sin(target_angle + 2/3*np.pi), length_platform * np.cos(target_angle + 2/3*np.pi)],\
-                     [length_platform * np.sin(target_angle + 4/3*np.pi), length_platform * np.cos(target_angle + 4/3*np.pi)]]))
+R = np.array([[np.cos(target_angle), np.sin(target_angle)], 
+              [-np.sin(target_angle), np.cos(target_angle)]])
+b = np.array([[0, length_platform], 
+              [3**(1/2)/2*length_platform, -1/2*length_platform], 
+              [-3**(1/2)/2*length_platform, -1/2*length_platform]])
 
 s = np.array([])
 for i in range(3):
-    sx = target_position[0] + b[i][0]*np.cos(target_angle) - b[i][1]*np.sin(target_angle) - a[i][0]
-    sy = target_position[1] + b[i][0]*np.sin(target_angle) + b[i][1]*np.cos(target_angle) - a[i][1]
-    s = np.append(s, np.sqrt(sx**2 + sy**2))
+    s = np.append(s, np.linalg.norm(target_position.T + np.dot(R, b[i].T) - a[i].T) - radius)
+
 print ('Желаемые координаты призмататических джоинтов: ')
 print (s)
 
@@ -213,16 +242,14 @@ x, y, angle = np.array([p.getBasePositionAndOrientation(platform_id)[0][0]]),\
 
 # Симуляция
 #s = [0.5407207058400401, 1.0486161515804193, 0.613607525282103]    # На этом примере работает
+#s = [0.7760276991678241, 0.936235804855084, 0.9586184796039283]
+
 
 anchor = ([anchor_id_1, anchor_id_2, anchor_id_3])
 for i in range(1, 2400):
     p.setJointMotorControl2(anchor[0], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[0], force=500)
     p.setJointMotorControl2(anchor[1], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[1], force=500)
     p.setJointMotorControl2(anchor[2], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[2], force=500)
-    #p.setJointMotorControl2(anchor[0], 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0.3, force=500)
-    #p.setJointMotorControl2(anchor[1], 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0.2, force=500)
-    #p.setJointMotorControl2(anchor[1], 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=-1, force=500)
-    #p.setJointMotorControl2(anchor[0], 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=2, force=500)
     x = np.append(x, p.getBasePositionAndOrientation(platform_id)[0][0])
     y = np.append(y, p.getBasePositionAndOrientation(platform_id)[0][2])
     angle = np.append(angle, p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1])
@@ -230,16 +257,11 @@ for i in range(1, 2400):
     
     #time.sleep(dt)
     p.stepSimulation()
-    #print (((p.getLinkState(platform_id, 1)[0][0] - a[0][0])**2 + (p.getLinkState(platform_id, 1)[0][2] - a[0][1])**2)**(1/2) - length_leg/2)
 
 print ('Фактические координаты призмататических джоинтов: ')
 print (((p.getLinkState(anchor_id_1, 1)[0][0] - a[0][0])**2 + (p.getLinkState(anchor_id_1, 1)[0][2] - a[0][1])**2)**(1/2) + length_leg/2)
 print (((p.getLinkState(anchor_id_2, 1)[0][0] - a[1][0])**2 + (p.getLinkState(anchor_id_2, 1)[0][2] - a[1][1])**2)**(1/2) + length_leg/2)
 print (((p.getLinkState(anchor_id_3, 1)[0][0] - a[2][0])**2 + (p.getLinkState(anchor_id_3, 1)[0][2] - a[2][1])**2)**(1/2) + length_leg/2)
-
-# turn off the motor for the free motion
-
-p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
 
 #angle = angle * 180/np.pi
 
