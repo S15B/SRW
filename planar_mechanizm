@@ -34,10 +34,13 @@ a = np.array([[np.sqrt(2)/2, 2], [2, 1.1], [0, 1]]) # Координаты не�
 d1 = [0.8561027164166857, 1.4239614999390986, -0.7335754112327715]
 d2 = [1.02582, 1.35344, -0.29031]
 d3 = [0.91974, 1.42904, -0.30708]
+d4 = [1.05736, 1.43764, -0.37268]
+d5 = [1.09509, 1.39992, -0.07958]
+d = d5
 
 # Желаемые координаты
-target_position = np.array(d3[0:2])
-target_angle = d3[2]
+target_position = np.array(d[0:2])
+target_angle = d[2]
 
 cyl_rot = p.getQuaternionFromEuler([np.pi/2, 0, 0]) 
 zero_rot = p.getQuaternionFromEuler([0, 0, 0])
@@ -80,7 +83,7 @@ anchor_id_1 = p.createMultiBody(
     baseVisualShapeIndex=joint_visual_shape[0],
     baseOrientation=cyl_rot,
     linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=leg_collision_shape[0:2],
+    linkCollisionShapeIndices=[-1] + [leg_collision_shape[0]],
     linkVisualShapeIndices=leg_visual_shape[0:2],
     linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
     linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi + np.arcsin(g1/h1)])] + [zero_rot],
@@ -97,7 +100,7 @@ anchor_id_2 = p.createMultiBody(
     baseVisualShapeIndex=joint_visual_shape[1],
     baseOrientation=cyl_rot,
     linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=leg_collision_shape[2:4],
+    linkCollisionShapeIndices=[-1] + [leg_collision_shape[2]],
     linkVisualShapeIndices=leg_visual_shape[2:4],
     linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
     linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, np.pi/2 - np.arccos(g2/h2)])] + [zero_rot] ,
@@ -114,7 +117,7 @@ anchor_id_3 = p.createMultiBody(
     baseVisualShapeIndex=joint_visual_shape[2],
     baseOrientation=cyl_rot,
     linkMasses=[0.1] * 2,
-    linkCollisionShapeIndices=leg_collision_shape[4:6],
+    linkCollisionShapeIndices=[-1] + [leg_collision_shape[4]],
     linkVisualShapeIndices=leg_visual_shape[4:6],
     linkPositions=[[0, 0, 0], [0, 0, -length_leg/2]],
     linkOrientations=[p.getQuaternionFromEuler([-np.pi/2, 0, -np.pi/2 + np.arccos(g3/h3)])] + [zero_rot] ,
@@ -210,65 +213,68 @@ constraint_id_3 = p.createConstraint(
     childFramePosition=[0, radius, 0]  
 )
 
-
-# Нужно ли это? Пока убрал
-# p.changeDynamics(anchor_id_1, 0, linearDamping=0, angularDamping=0)
-# p.changeDynamics(anchor_id_1, 1, linearDamping=0, angularDamping=0)
-# p.changeDynamics(anchor_id_2, 0, linearDamping=0, angularDamping=0)
-# p.changeDynamics(anchor_id_2, 1, linearDamping=0, angularDamping=0)
-# p.changeDynamics(anchor_id_3, 0, linearDamping=0, angularDamping=0)
-# p.changeDynamics(anchor_id_3, 1, linearDamping=0, angularDamping=0)
-# for i in range(3, 6):
-#     p.changeDynamics(platform_id, i, linearDamping=0, angularDamping=0)
-
-p.setJointMotorControl2(platform_id, 3, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
-p.setJointMotorControl2(platform_id, 4, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
-p.setJointMotorControl2(platform_id, 5, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
-
-start_angle = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1]
-
-# Расчет формулы 
-R = np.array([[np.cos(target_angle), np.sin(target_angle)], 
-              [-np.sin(target_angle), np.cos(target_angle)]])
+# Расчет обратной кинематики
+R = np.array([[np.cos(target_angle), -np.sin(target_angle)], 
+              [np.sin(target_angle), np.cos(target_angle)]])
 b = np.array([[0, length_platform], 
               [3**(1/2)/2*length_platform, -1/2*length_platform], 
               [-3**(1/2)/2*length_platform, -1/2*length_platform]])
 
 s = np.array([])
 for i in range(3):
-    s = np.append(s, np.linalg.norm(target_position.T + np.dot(R, b[i].T) - a[i].T) - radius)
+    s = np.append(s, np.linalg.norm(target_position + np.dot(b[i], R) - a[i]))
 
-print ('Желаемые координаты призмататических джоинтов: ')
-print (s)
+# Координаты точек на основании и на платформе
+b = np.array([[0, length_platform], 
+              [3**(1/2)/2*length_platform, -1/2*length_platform], 
+              [-3**(1/2)/2*length_platform, -1/2*length_platform]])
 
 # Создание массивов для графиков
 t = np.array([0])
 x, y, angle = np.array([p.getBasePositionAndOrientation(platform_id)[0][0]]),\
               np.array([p.getBasePositionAndOrientation(platform_id)[0][2]]),\
               np.array([p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1]])
+leg_1, leg_2, leg_3 = np.array([p.getJointState(anchor_id_1, 1)[0]]),\
+                      np.array([p.getJointState(anchor_id_2, 1)[0]]),\
+                      np.array([p.getJointState(anchor_id_3, 1)[0]])
 
-# Симуляция
-#s = [0.5407207058400401, 1.0486161515804193, 0.613607525282103]    # На этом примере работает
-#s = [0.7760276991678241, 0.936235804855084, 0.9586184796039283]
+def inv_Jac(p, theta):
+    J_inv = np.zeros((3, 3))
+    R = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]])
+    
+    for i in range(3):
+        B_i = R @ b[i] + p
+        BiC = B_i - p
 
+        n_i = B_i - a[i]
+        n_i = n_i / np.linalg.norm(n_i)  
 
-anchor = ([anchor_id_1, anchor_id_2, anchor_id_3])
+        J_inv[i, 0] = n_i[0] * BiC[1] - n_i[1] * BiC[0]
+        J_inv[i, 1] = n_i[0]
+        J_inv[i, 2] = n_i[1]
+    return J_inv
+
 for i in range(1, 4800):
-    p.setJointMotorControl2(anchor[0], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[0], force=500)
-    p.setJointMotorControl2(anchor[1], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[1], force=500)
-    p.setJointMotorControl2(anchor[2], 1, controlMode=p.POSITION_CONTROL, targetPosition=s[2], force=500)
+    #print (np.linalg.det(inv_Jac([x[-1], y[-1]], angle[-1])))
+    dq = inv_Jac([x[-1], y[-1]], angle[-1]) @ (np.array([[x[-1] - target_position[0]], 
+                                                         [y[-1] - target_position[1]], 
+                                                         [angle[-1] - target_angle]]))
+    #print (dq) 
+    p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[0], force=150)
+    p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[1], force=150)
+    p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[2], force=150)
     x = np.append(x, p.getBasePositionAndOrientation(platform_id)[0][0])
     y = np.append(y, p.getBasePositionAndOrientation(platform_id)[0][2])
     angle = np.append(angle, p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1])
+    leg_1 = np.append(leg_1, p.getJointState(anchor_id_1, 1)[0])
+    leg_2 = np.append(leg_2, p.getJointState(anchor_id_2, 1)[0])
+    leg_3 = np.append(leg_3, p.getJointState(anchor_id_3, 1)[0])
     t = np.append(t, t[-1]+dt)
-    
+
     #time.sleep(dt)
     p.stepSimulation()
-
-print ('Фактические координаты призмататических джоинтов: ')
-print (((p.getLinkState(anchor_id_1, 1)[0][0] - a[0][0])**2 + (p.getLinkState(anchor_id_1, 1)[0][2] - a[0][1])**2)**(1/2) + length_leg/2)
-print (((p.getLinkState(anchor_id_2, 1)[0][0] - a[1][0])**2 + (p.getLinkState(anchor_id_2, 1)[0][2] - a[1][1])**2)**(1/2) + length_leg/2)
-print (((p.getLinkState(anchor_id_3, 1)[0][0] - a[2][0])**2 + (p.getLinkState(anchor_id_3, 1)[0][2] - a[2][1])**2)**(1/2) + length_leg/2)
 
 #angle = angle * 180/np.pi
 
@@ -282,8 +288,8 @@ print ('Фактические координаты и угол:', round(x[-1], 
 plt.figure('')
 plt.subplot(4, 1, 1)
 plt.grid(True)
-plt.title('Приведение из {0} в положение {1}'.format(round(start_angle, 4), round(target_angle, 4)))
-plt.title('Постоянная скорость двух призматических джоинтов')
+plt.title('Приведение из {0} в положение {1}'.format(round(angle[0], 4), round(target_angle, 4)))
+plt.title('Якобиан')
 plt.xlabel('Время')
 plt.ylabel('Координата X')
 plt.axhline(y = target_position[0], color='r', linestyle='dashed')
@@ -305,4 +311,25 @@ plt.grid(True)
 plt.xlabel('X')
 plt.ylabel('Y(X)')
 plt.plot(x, y)
+plt.show()
+
+plt.figure('leg')
+plt.subplot(3, 1, 1)
+plt.grid(True)
+plt.xlabel('Время')
+plt.ylabel('Длина')
+plt.axhline(y = s[0], color='r', linestyle='dashed')
+plt.plot(t, leg_1)
+plt.subplot(3, 1, 2)
+plt.grid(True)
+plt.xlabel('Время')
+plt.ylabel('Длина')
+plt.axhline(y = s[1], color='r', linestyle='dashed')
+plt.plot(t, leg_2)
+plt.subplot(3, 1, 3)
+plt.grid(True)
+plt.xlabel('Время')
+plt.ylabel('Длина')
+plt.axhline(y = s[2], color='r', linestyle='dashed')
+plt.plot(t, leg_3)
 plt.show()
