@@ -162,7 +162,7 @@ p.setJointMotorControl2(platform_id, 5, controlMode=p.POSITION_CONTROL, targetPo
 # На стартовую позицию
 for i in range(1, 240):
     p.stepSimulation()
-    #time.sleep(dt)
+    time.sleep(dt)
 
 p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
 p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
@@ -271,10 +271,32 @@ leg_1, leg_2, leg_3 = np.array([p.getJointState(anchor_id_1, 1)[0]]),\
                       np.array([p.getJointState(anchor_id_2, 1)[0]]),\
                       np.array([p.getJointState(anchor_id_3, 1)[0]])
 
-for i in range(1, 1000):
+for j in range(1, 960):
     v = -0.1
     v2 = v/(p.getLinkState(platform_id, 5)[0][1] - a[2][1])/(np.linalg.norm(p.getLinkState(platform_id, 5)[0][0::2] - a[2]))
     v3 = v/(p.getLinkState(platform_id, 3)[0][1] - a[1][1])/(np.linalg.norm(p.getLinkState(platform_id, 3)[0][0::2] - a[1]))
+
+        # Jacobian
+    J_inv = np.zeros((3, 3))
+    R = np.array([
+        [np.cos(angle[-1]), -np.sin(angle[-1])],
+        [np.sin(angle[-1]),  np.cos(angle[-1])]])
+    pos = np.array([x[-1], y[-1]])
+
+    for i in range(3):
+        b_global = b[i] @ R + pos
+        l_vec = b_global - a[i]
+        gamma = np.arctan2(l_vec[1], l_vec[0])  # угол привода
+
+        bxi, byi = b[i]
+        J_inv[i, 0] = np.sin(gamma - angle[-1]) * bxi - np.cos(gamma - angle[-1]) * byi
+        J_inv[i, 1] = np.cos(gamma)
+        J_inv[i, 2] = np.sin(gamma)
+
+    speed = -J_inv @ [0, 0, v]
+    print (speed)
+    print (v, v3, v2)
+
     p.setJointMotorControl2(anchor_id_1, 1,  controlMode=p.VELOCITY_CONTROL, targetVelocity=v, force=400)
     p.setJointMotorControl2(anchor_id_2, 1,  controlMode=p.VELOCITY_CONTROL, targetVelocity=v2, force=400)
     p.setJointMotorControl2(anchor_id_3, 1,  controlMode=p.VELOCITY_CONTROL, targetVelocity=v3, force=400) 
