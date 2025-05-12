@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 
 # Инициализация PyBullet
-#p.connect(p.GUI)
-p.connect(p.DIRECT)
+p.connect(p.GUI)
+#p.connect(p.DIRECT)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 
 # Создание плоскости
@@ -17,7 +17,7 @@ p.loadURDF("plane.urdf")
 camera_distance = 2.5  # Расстояние от камеры до целевой точки
 camera_pitch = 0  # Угол наклона камеры (в градусах)
 camera_yaw = 0     # Угол поворота камеры (в градусах)
-position = [1, 0, 1.5]  # Точка, на которую направлена камера
+position = [1, 0, 1.4]  # Точка, на которую направлена камера
 
 p.resetDebugVisualizerCamera(camera_distance, camera_yaw, camera_pitch, position)
 
@@ -27,7 +27,7 @@ dt = 1/240      # pybullet simulation step
 radius, height = 0.04, 0.06                         # Цилиндр
 width_leg, depth_leg, length_leg = 0.07, 0.06, 0.5  # Плечо
 length_platform = 0.25                              # Bi
-a = np.array([[np.sqrt(2)/2, 2+0.5], [2, 1.1], [0, 1]]) # Координаты неподвижных платформ
+a = np.array([[0.7, 2.5], [2, 1.1], [0, 1]]) # Координаты неподвижных платформ
 
 # Примеры
 d1 = [0.86918, 1.32903, 0.38175]
@@ -40,8 +40,6 @@ d7 = [0.62985, 1.30055, -0.10491]
 d8 = [1.51803, 1.45346, -1.31209]
 d = d8
 
-# Желаемые координаты
-target_position = np.array(d)
 
 cyl_rot = p.getQuaternionFromEuler([np.pi/2, 0, 0]) 
 zero_rot = p.getQuaternionFromEuler([0, 0, 0])
@@ -201,7 +199,7 @@ p.setJointMotorControl2(platform_id, 5, controlMode=p.POSITION_CONTROL, targetPo
 # На стартовую позицию
 for i in range(1, 240):
     p.stepSimulation()
-    #time.sleep(dt)
+    # time.sleep(dt)
 
 p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
 p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=0, force=0)
@@ -266,32 +264,43 @@ legs = np.array([[p.getJointState(anchor_id_1, 1)[0],
 legs_velocity = np.array([[p.getJointState(anchor_id_1, 1)[1], 
                            p.getJointState(anchor_id_2, 1)[1],
                            p.getJointState(anchor_id_3, 1)[1]]])
-print (legs_velocity)
+
 calculate_position = np.array([position[0]])
 calculate_legs_velocity = np.array([[0, 0, 0]])
 
-# # Расчет обратной кинематики
-# R = np.array([[np.cos(target_position[2]), -np.sin(target_position[2])], 
-#               [np.sin(target_position[2]), np.cos(target_position[2])]])
-# b = np.array([[0, length_platform], 
-#               [3**(1/2)/2*length_platform, -1/2*length_platform], 
-#               [-3**(1/2)/2*length_platform, -1/2*length_platform]])
+# Желаемые координаты для обратной кинематики
+target_position = np.array([1, 1.4, 0])
 
-# s = np.array([])
-# for i in range(3):
-#     s = np.append(s, np.linalg.norm(target_position[0:2] + np.dot(b[i], R) - a[i]))
+# Расчет обратной кинематики
+R = np.array([[np.cos(target_position[2]), -np.sin(target_position[2])], 
+              [np.sin(target_position[2]), np.cos(target_position[2])]])
+b = np.array([[0, length_platform], 
+              [3**(1/2)/2*length_platform, -1/2*length_platform], 
+              [-3**(1/2)/2*length_platform, -1/2*length_platform]])
+
+s = np.array([])
+for i in range(3):
+    s = np.append(s, np.linalg.norm(target_position[0:2] + np.dot(b[i], R) - a[i]))
+
+position = np.array([[p.getBasePositionAndOrientation(platform_id)[0][0], 
+                      p.getBasePositionAndOrientation(platform_id)[0][2], 
+                      p.getEulerFromQuaternion(p.getBasePositionAndOrientation(platform_id)[1])[1]]])
+
+print (position)
 
 target_position = np.array([[1, 1.9, 0], [1.5, 1.9, 0], [1.5, 1.4, 0]])
+# target_position = np.array([[1.5, 1.5, 0]])
 
 betta = np.array([position[0]])
-d_betta = np.array([[0, 0, 0], [1/14, 1/14, 0], [1/14, -1/14, 0], [0, 0, 0]])
-#d_betta = np.array([[0, 0, 0], [1/7, 0, 0], [0, -1/7, 0], [0, 0, 0]])
+d_betta = np.array([[0, 0, 0], [0.1, 0.1, 0], [0.1, -0.1, 0], [0, 0, 0]])
+# d_betta = np.array([[0, 0, 0], [0, 0, 0], [0, -1/7, 0], [0, 0, 0]])
 h = -1
 
 # Симуляция
 for j in range(30*240):
+    t = np.append(t, t[-1]+dt)
 
-# Jacobian
+# Обратный якобиан
     J_inv = np.zeros((3, 3))
     R = np.array([
         [np.cos(position[-1][2]), -np.sin(position[-1][2])],
@@ -308,31 +317,32 @@ for j in range(30*240):
         J_inv[i, 1] = n_i[1]
         J_inv[i, 2] = n_i[0] * BiC[1] - n_i[1] * BiC[0]
 
-# Polynom
+# Расчет полинома
     T = 10
-    t = np.append(t, t[-1]+dt)
-    if j % (240*T) == 0: 
+    if j % (240*T) == 0:    # Переключение на новую точку 
         h += 1
         betta[-1] = position[-1]
         betta =  np.vstack([betta, target_position[h]])
-    sus = np.polyval([(2*betta[h] + (d_betta[h] + d_betta[h+1])*T - 2*betta[h+1])/T**3, 
+    sus = np.polyval([(2*betta[h] + (d_betta[h] + d_betta[h+1])*T - 2*betta[h+1])/T**3,         # Полином
                       (3*betta[h+1] - 3*betta[h] - 2*d_betta[h]*T - d_betta[h+1]*T)/T**2,
                       d_betta[h], betta[h]], t[-1] - h*T)
 
     calculate_position = np.vstack([calculate_position, sus])
-    # if j % (100) == 0: print (sus)
-    d_sus = np.polyval([3*(2*betta[h] + (d_betta[h] + d_betta[h+1])*T - 2*betta[h+1])/T**3, 
+
+    d_sus = np.polyval([3*(2*betta[h] + (d_betta[h] + d_betta[h+1])*T - 2*betta[h+1])/T**3,     # Производная полинома
                         2*(3*betta[h+1] - 3*betta[h] - 2*d_betta[h]*T - d_betta[h+1]*T)/T**2,
                         d_betta[h]], t[-1] - h*T) 
-    # if j % (100) == 0: print (d_sus) 
     dq = J_inv @ (d_sus)
-    # print (np.linalg.cond(J_inv))
 
     calculate_legs_velocity = np.vstack([calculate_legs_velocity, dq])
+
     p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[0])
     p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[1])
     p.setJointMotorControl2(anchor_id_3, 1, controlMode=p.VELOCITY_CONTROL, targetVelocity=dq[2])
 
+    # p.setJointMotorControl2(anchor_id_1, 1, controlMode=p.POSITION_CONTROL, targetPosition=s[0])
+    # p.setJointMotorControl2(anchor_id_2, 1, controlMode=p.POSITION_CONTROL, targetPosition=s[1])
+    # p.setJointMotorControl2(anchor_id_3, 1, controlMode=p.POSITION_CONTROL, targetPosition=s[2]) 
     
     position = np.vstack([position, [p.getBasePositionAndOrientation(platform_id)[0][0], 
                                      p.getBasePositionAndOrientation(platform_id)[0][2], 
@@ -355,56 +365,55 @@ print ('Желаемые координаты и угол:', np.round(target_pos
 print ('Фактические координаты и угол:', np.round(position[-1], 5))
 
 # Отрисовка графиков
-plt.figure('')
-plt.subplot(3, 1, 1)
+plt.figure('1')
+plt.subplot(2, 1, 1)
 plt.grid(True)
-plt.title('Приведение из {0} в положение {1}'.format(round(position[0][2], 4), round(position[-1][2], 4)))
-plt.title('Скорость и Якобиан')
-plt.xlabel('Время')
-plt.ylabel('Координата X')
-#plt.axhline(y = target_position[0], color='r', linestyle='dashed')
+#plt.title('Приведение из {0} в положение {1}'.format(round(position[0][2], 4), round(position[-1][2], 4)))
+plt.xlabel('Time, s')
+plt.ylabel('x, m')
+#plt.axhline(y = target_position[0,0], color='r', linestyle='dashed')
 plt.plot(t, position[:,0])
-plt.subplot(3, 1, 2)
+plt.subplot(2, 1, 2)
 plt.grid(True)
-plt.xlabel('Время')
-plt.ylabel('Координата Y')
-#plt.axhline(y = target_position[1], color='r', linestyle='dashed')
+plt.xlabel('Time, s')
+plt.ylabel('y, m')
+#plt.axhline(y = target_position[0,1], color='r', linestyle='dashed')
 plt.plot(t, position[:,1])
-plt.subplot(3, 1, 3)
-plt.grid(True)
-plt.xlabel('Время')
-plt.ylabel('Угол')
-#plt.axhline(y = target_position[2], color='r', linestyle='dashed')
-plt.plot(t, position[:,2])
+# plt.subplot(3, 1, 3)
+# plt.grid(True)
+# plt.xlabel('Time, s')
+# plt.ylabel('\u03c6, deg')
+#plt.axhline(y = target_position[0,2], color='r', linestyle='dashed')
+# plt.plot(t, position[:,2])
 
 plt.figure('X(Y)')
 plt.grid(True)
-plt.xlabel('X')
-plt.ylabel('Y')
+plt.xlabel('x, m')
+plt.ylabel('y, m')
 plt.plot(calculate_position[:,0], calculate_position[:,1], color='r', label='Теоретический график')
-plt.plot(position[:,0], position[:,1], label='Фактический график')
+plt.plot(position[:,0], position[:,1], label='Положение платформы')
 plt.plot(target_position[:,0], target_position[:,1], 'go', lw=10, label='Точки обхода')
 plt.legend()
 
-# plt.figure('legs')
-# plt.subplot(3, 1, 1)
-# plt.grid(True)
-# plt.xlabel('Время')
-# plt.ylabel('Длина')
-# plt.axhline(y = s[0], color='r', linestyle='dashed')
-# plt.plot(t, legs[:,0])
-# plt.subplot(3, 1, 2)
-# plt.grid(True)
-# plt.xlabel('Время')
-# plt.ylabel('Длина')
-# plt.axhline(y = s[1], color='r', linestyle='dashed')
-# plt.plot(t, legs[:,1])
-# plt.subplot(3, 1, 3)
-# plt.grid(True)
-# plt.xlabel('Время')
-# plt.ylabel('Длина')
-# plt.axhline(y = s[2], color='r', linestyle='dashed')
-# plt.plot(t, legs[:,2])
+plt.figure('2')
+plt.subplot(3, 1, 1)
+plt.grid(True)
+plt.xlabel('Time, s')
+plt.ylabel('a$_1$, m')
+plt.axhline(y = s[0], color='r', linestyle='dashed')
+plt.plot(t, legs[:,0])
+plt.subplot(3, 1, 2)
+plt.grid(True)
+plt.xlabel('Time, s')
+plt.ylabel('a$_2$, m')
+plt.axhline(y = s[1], color='r', linestyle='dashed')
+plt.plot(t, legs[:,1])
+plt.subplot(3, 1, 3)
+plt.grid(True)
+plt.xlabel('Time, s')
+plt.ylabel('a$_3$, m')
+plt.axhline(y = s[2], color='r', linestyle='dashed')
+plt.plot(t, legs[:,2])
 
 plt.figure('legs velocity')
 plt.subplot(3, 1, 1)
@@ -428,4 +437,5 @@ plt.ylabel('Скорость')
 plt.plot(t, legs_velocity[:, 2], label='Фактический график')
 plt.plot(t, calculate_legs_velocity[:, 2], color='r', label='Теоретический график')
 plt.legend()
+
 plt.show()
